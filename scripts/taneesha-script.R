@@ -155,32 +155,19 @@ claims_parsed_header <- map_df(chunks, function(chunk) {
 claims_nlp_header <- nlp_fn(claims_parsed_header)
 View(claims_nlp_header)
 
-######-Fit PCA Logistic Regression Model (no headers)-##########
+### fit_pca + test predictors
 library(dplyr)
 library(rsample)
 library(yardstick)
 library(broom)   # for augment()
 library(modelr)
 
-claims_subset <- claims_nlp %>%
-  select(-.id) %>%
-  mutate(class = ifelse(bclass == "Relevant claim content", 1, 0)) %>%
-  select(-bclass)
-
-set.seed(101422)
-claims_split <- initial_split(claims_subset, prop = 0.8)
-train_data <- training(claims_split)
-View(train_data)
-test_data  <- testing(claims_split)
-
-X_train <- as.matrix(select(train_data, -class))
-X_test  <- as.matrix(select(test_data, -class))
-
 zero_var_cols <- apply(X_train, 2, function(col) var(col) == 0)
 X_train_filtered <- X_train[, !zero_var_cols]
 X_test_filtered  <- X_test[, !zero_var_cols]
 
-pca_res <- prcomp(X_train_filtered, center = TRUE, scale. = FALSE)
+pca_res <- prcomp(X_train_filtered, center = TRUE)
+
 cumvar <- cumsum(pca_res$sdev^2 / sum(pca_res$sdev^2))
 n_pc <- which(cumvar >= 0.9)[1]
 
@@ -198,75 +185,6 @@ test_preds <- augment(fit_pca, newdata = X_test_pca, type.predict = "response") 
     estimate = factor(ifelse(pred_prob > 0.5, 1, 0), levels = c(0,1)),
     truth    = factor(class, levels = c(0,1))
   )
-
-class_metrics <- metric_set(
-  yardstick::accuracy,
-  yardstick::sensitivity,
-  yardstick::specificity,
-  yardstick::f_meas
-)
-
-results <- test_preds %>%
-  class_metrics(
-    truth = truth,
-    estimate = estimate,
-    event_level = "second" 
-  )
-
-######-Fit PCA Logistic Regression Model (with headers)-##########
-claims_subset <- claims_nlp_header %>%
-  select(-.id) %>%
-  mutate(class = ifelse(bclass == "Relevant claim content", 1, 0)) %>%
-  select(-bclass)
-
-set.seed(101422)
-claims_split <- initial_split(claims_subset, prop = 0.8)
-train_data <- training(claims_split)
-View(train_data)
-test_data  <- testing(claims_split)
-
-X_train <- as.matrix(select(train_data, -class))
-X_test  <- as.matrix(select(test_data, -class))
-
-zero_var_cols <- apply(X_train, 2, function(col) var(col) == 0)
-X_train_filtered <- X_train[, !zero_var_cols]
-X_test_filtered  <- X_test[, !zero_var_cols]
-
-pca_res <- prcomp(X_train_filtered, center = TRUE, scale. = FALSE)
-cumvar <- cumsum(pca_res$sdev^2 / sum(pca_res$sdev^2))
-n_pc <- which(cumvar >= 0.9)[1]
-
-X_train_pca <- as.data.frame(pca_res$x[, 1:n_pc])
-X_test_pca  <- as.data.frame(predict(pca_res, newdata = X_test_filtered)[, 1:n_pc])
-
-X_train_pca$class <- train_data$class
-X_test_pca$class  <- test_data$class
-
-fit_pca <- glm(class ~ ., data = X_train_pca, family = "binomial")
-
-test_preds <- augment(fit_pca, newdata = X_test_pca, type.predict = "response") %>%
-  rename(pred_prob = .fitted) %>%
-  mutate(
-    estimate = factor(ifelse(pred_prob > 0.5, 1, 0), levels = c(0,1)),
-    truth    = factor(class, levels = c(0,1))
-  )
-
-class_metrics <- metric_set(
-  yardstick::accuracy,
-  yardstick::sensitivity,
-  yardstick::specificity,
-  yardstick::f_meas
-)
-
-results_header <- test_preds %>%
-  class_metrics(
-    truth = truth,
-    estimate = estimate,
-    event_level = "second" 
-  )
-
-results
-results_header
 
 # Question 2 
 
