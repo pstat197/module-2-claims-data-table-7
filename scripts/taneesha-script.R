@@ -248,7 +248,6 @@ n_pc <- which(cumvar >= 0.9)[1]
 X_train_pca <- as.data.frame(pca_bigram$x[, 1:n_pc])
 X_test_pca  <- as.data.frame(predict(pca_bigram, newdata = X_test_filtered)[, 1:n_pc])
 
-# --- stops running 
 word_log_odds <- log(test_preds$pred_prob / (1 - test_preds$pred_prob))
 X_test_pca$word_log_odds <- word_log_odds
 X_train_pca$word_log_odds <- log(predict(fit_pca, newdata = X_train_pca, type = "response") /
