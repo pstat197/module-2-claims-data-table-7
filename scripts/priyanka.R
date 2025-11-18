@@ -1,7 +1,5 @@
 #####################-QUESTION 1-####################################################
 
-####-Add Headers-############
-
 ## this script contains functions for preprocessing
 ## claims data; intended to be sourced 
 require(tidyverse)
@@ -64,6 +62,8 @@ nlp_fn <- function(parse_data.out){
 
 claims_parsed <- parse_data(claims_raw)
 claims_nlp <- nlp_fn(claims_parsed)
+
+####-Add Headers-############
 
 # function to parse html and clean text
 parse_fn_header <- function(.html){
