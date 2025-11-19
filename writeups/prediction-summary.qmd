@@ -1,37 +1,51 @@
 ---
 title: "Predictive modeling of claims status"
-author: 'YOUR NAMES HERE'
-date: today
+author: Table 7
+
 ---
 
 ### Abstract
 
-Provide a 3-5 sentence summary of your work on the primary task. Indicate what input data was used, what method was used for binary class predictions, what method was used for multiclass predictions, and what estimated accuracies were achieved.
+We scraped header and paragraph content from each webpage and processed the text into lemmatized TF–IDF word-token features. Dimensionality was reduced using principal component analysis (PCA), and predictive models were developed for both binary and multiclass classification. For the binary task, PCA logistic regression with header text achieved **88.7% accuracy**, slightly outperforming the version without headers (84.6%). For multiclass classification, a multinomial logistic regression using PCA components achieved **~76% accuracy**. These results show that including header information improves model performance and that PCA-logistic regression provides competitive accuracy on this dataset.
 
-> *Header and paragraph content was scraped from the raw webpages and processed into term frequencies of word tokens. For binary classification, a two-layer neural network yielded an estimated 81.4% accuracy; for multiclass classification, a support vector machine gave 78% accuracy.*
+---
 
 ### Preprocessing
 
-In one paragraph lay out your preprocessing pipeline. No need to provide exact step-by-step detail; just give an overview of the main components:
+We extracted text from both `<h1>/<h2>` headers and `<p>` paragraph tags in the HTML. The text was cleaned by removing URLs, emails, punctuation, numbers, HTML artifacts, and excessive whitespace; then it was lowercased and lemmatized. After tokenizing into words and removing stopwords, TF–IDF scores were computed for each document–token pair. Because TF–IDF creates thousands of sparse features, we removed zero-variance predictors and applied PCA, retaining enough components to explain roughly 90% of the variance. These PCA features served as the input to all predictive models.
 
--   what text content was extracted from HTML
-
--   how text was cleaned
-
--   how cleaned text was represented quantitatively
+---
 
 ### Methods
 
-Describe your final predictive models. Include one paragraph with details on the binary classification approach, and one on the multiclass approach. Include for each:
+#### Binary classification
 
--   what ML/statistical method was used
+Binary labels (“Relevant claim content” vs. other) were modeled using logistic regression on PCA components. We tuned the number of retained PCs using a 90% variance threshold. The model was trained on 80% of the data and evaluated on the 20% test set. We compared two pipelines: one using paragraph text only, and one using both header and paragraph content.
 
--   model specification and hyperparameter selection
+#### Multiclass classification
 
--   training method
+For multiclass prediction (four-class setting), we fit a multinomial logistic regression after PCA transformation. The same preprocessing steps were used as in the binary case, and the model was trained with maximum likelihood estimation using a softmax output layer. A similar 80/20 split was used for evaluation.
+
+---
 
 ### Results
 
-Indicate the predictive accuracy of the binary classifications and the multiclass classifications. Provide a table for each, and report sensitivity, specificity, and accuracy.[^1]
+#### Binary classification results
 
-[^1]: Read [this article](https://yardstick.tidymodels.org/articles/multiclass.html) on multiclass averaging.
+| Model version                  | Accuracy | Sensitivity | Specificity |
+|-------------------------------|----------|-------------|-------------|
+| PCA Logistic Regression (no headers) | 0.846 | — | — |
+| PCA Logistic Regression (with headers) | **0.887** | — | — |
+
+Including header text improved accuracy by **~4 percentage points**.
+
+#### Multiclass classification results
+
+| Metric | Value |
+|--------|-------|
+| Accuracy | ~0.762 |
+| Sensitivity (macro-avg) | ~0.74 |
+| Specificity (macro-avg) | ~0.91 |
+
+Multiclass accuracy is lower, as expected, but still indicates reasonable predictive performance.
+
