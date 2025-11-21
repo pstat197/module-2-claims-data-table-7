@@ -1,25 +1,27 @@
 ---
 title: "Summary of exploratory tasks"
-author: 'YOUR NAMES HERE'
-date: today
+author: "Table 7"
 ---
 
 ### HTML scraping
 
-Does including header content improve predictions? Answer the question and provide quantitative evidence supporting your answer.
+We extended the scraping strategy to include `<h1>` and `<h2>` header text in addition to paragraph content. After applying the same TF–IDF preprocessing and PCA transformation, we fit logistic regression models with and without header information. Including headers improved binary classification accuracy from **0.846 → 0.887**, demonstrating that headers contain meaningful topical cues relevant to identifying claim-related content. This improvement provides strong evidence that header information should be included in the final modeling pipeline.
+
+---
 
 ### Bigrams
 
-Do bigrams capture additional information relevant to the classification of interest? Answer the question, **briefly** describe what analysis you conducted to arrive at your answer, and provide quantitative evidence supporting your answer.
+We generated bigrams from the cleaned text and created a separate TF–IDF matrix to capture phrase-level information. After dimensionality reduction, we combined (1) predicted log-odds from the word-token model and (2) PCA components from the bigram model into a secondary logistic regression. The combined model improved accuracy only marginally (less than 1%), suggesting that bigrams do capture *some* additional context but do not substantially improve predictive performance beyond unigrams for this dataset.
+
+---
 
 ### Neural net
 
-Summarize the neural network model you trained by desribing:
+We also implemented a neural network model consisting of:
 
--   architecture
+- a text vectorization layer computing TF–IDF,
+- a 25-unit ReLU hidden layer with dropout,
+- a sigmoid output for binary classification.
 
--   optimization and loss
+The model was trained for **5 epochs**, using **binary cross-entropy loss** and the **Adam optimizer** with a **30% validation split**. Predictive accuracy stabilized around **81–82%**, which is competitive but slightly below the PCA logistic regression with headers. While the neural net performed reasonably well, it did not outperform the simpler PCA-based logistic regression pipeline.
 
--   training epochs
-
--   predictive accuracy
