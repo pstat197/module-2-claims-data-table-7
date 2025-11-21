@@ -11,7 +11,6 @@ library(tidymodels)
 
 ### Question 1 
 
-
 load("C:/Users/prasa/Desktop/ds/pstat197/197a/module-2-claims-data-table-7/data/claims-raw.RData")
 View(claims_raw)
 
@@ -65,8 +64,30 @@ nlp_fn <- function(parse_data.out){
   return(out)
 }
 
-claims_parsed <- parse_data(claims_raw)
-claims_nlp <- nlp_fn(claims_parsed)
+# Diagnosis
+library(purrr)
+
+safe_parse_fn <- purrr::possibly(parse_fn, otherwise = NA_character_)
+
+parse_data_safe <- function(.df) {
+  df <- .df %>%
+    filter(str_detect(text_tmp, '<!'))  # keep only HTML-like rows
+  
+  df$parsed <- map_chr(df$text_tmp, safe_parse_fn)  # SAFE + vectorized
+  
+  df %>%
+    filter(!is.na(parsed)) %>%         # drop failed rows
+    mutate(text_clean = parsed) %>%
+    select(-parsed)
+}
+
+claims_parsed1 <- parse_data_safe(claims_raw)
+bad <- which(is.na(map_chr(claims_raw$text_tmp, safe_parse_fn)))
+bad  # e.g. [1] 1270 
+
+#claims_parsed <- parse_data(claims_raw)
+### ERROR MESSAGE
+claims_nlp <- nlp_fn(claims_parsed1)
 
 ## add header
 parse_fn_header <- function(.html){
@@ -153,20 +174,34 @@ claims_parsed_header <- map_df(chunks, function(chunk) {
 })
 
 claims_nlp_header <- nlp_fn(claims_parsed_header)
-View(claims_nlp_header)
 
-### fit_pca + test predictors
+######-Fit PCA + test-##########
 library(dplyr)
 library(rsample)
 library(yardstick)
 library(broom)   # for augment()
 library(modelr)
 
-zero_var_cols <- apply(X_train, 2, function(col) var(col) == 0)
+claims_subset <- claims_nlp %>%
+  mutate(class = ifelse(bclass == "Relevant claim content", 1, 0)) %>%
+  select(.id, class, everything(), -bclass)
+
+set.seed(101422)
+claims_split <- initial_split(claims_subset, prop = 0.8)
+train_data <- training(claims_split)
+View(train_data)
+test_data  <- testing(claims_split)
+
+# Exclude class and .id
+X_train <- as.matrix(select(train_data, -class, -.id))
+X_test  <- as.matrix(select(test_data, -class, -.id))
+
+# Remove zero-variance columns
+zero_var_cols <- apply(X_train, 2, var) == 0
 X_train_filtered <- X_train[, !zero_var_cols]
 X_test_filtered  <- X_test[, !zero_var_cols]
 
-pca_res <- prcomp(X_train_filtered, center = TRUE)
+pca_res <- prcomp(X_train_filtered, center = TRUE, scale. = FALSE)
 
 cumvar <- cumsum(pca_res$sdev^2 / sum(pca_res$sdev^2))
 n_pc <- which(cumvar >= 0.9)[1]
@@ -222,12 +257,11 @@ nlp_bigram_fn <- function(parse_data.out, top_n = 1500) {
   return(out)
 }
 claims_bigrams <- nlp_bigram_fn(claims_parsed_header)
-View(claims_bigrams)
 
 library(rsample)
-claims_subset <- claims_bigrams %>%
+claims_subset <- claims_nlp %>%
   mutate(class = ifelse(bclass == "Relevant claim content", 1, 0)) %>%
-  select(-bclass)
+  select(.id, class, everything(), -bclass)
 
 set.seed(101422)
 claims_split <- initial_split(claims_subset, prop = 0.8)
@@ -250,6 +284,7 @@ X_test_pca  <- as.data.frame(predict(pca_bigram, newdata = X_test_filtered)[, 1:
 
 word_log_odds <- log(test_preds$pred_prob / (1 - test_preds$pred_prob))
 X_test_pca$word_log_odds <- word_log_odds
+
 X_train_pca$word_log_odds <- log(predict(fit_pca, newdata = X_train_pca, type = "response") /
                                    (1 - predict(fit_pca, newdata = X_train_pca, type = "response")))
 
@@ -267,11 +302,13 @@ bigram_preds <- augment(fit_bigram, newdata = X_test_pca, type.predict = "respon
   )
 
 results_bigram <- bigram_preds %>%
-  class_metrics(
+  metrics(
     truth = truth,
-    estimate = estimate,
-    event_level = "second"
+    estimate = estimate
   )
+results_prob <- bigram_preds %>%
+  roc_auc(truth, pred_prob)
+
 
 results_bigram
-
+results_prob
